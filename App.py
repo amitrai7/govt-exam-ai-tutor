@@ -2,8 +2,11 @@ import streamlit as st
 import os
 import random
 import json
+import time
 from openai import OpenAI
 import math
+from datetime import datetime, timedelta
+import pytz
 
 # Set up OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -24,6 +27,29 @@ def load_tips():
 
 shortcut_notes = load_tips()
 
+# --- Load Cross Multiplication Pool ---
+@st.cache_data
+def load_cross_pool():
+    with open("cross_questions_pool.json", "r") as f:
+        return json.load(f)
+
+cross_pool = load_cross_pool()
+
+# --- Daily 5:30 PM IST Refresh Logic ---
+ist = pytz.timezone("Asia/Kolkata")
+now_ist = datetime.now(ist)
+today_str = now_ist.strftime("%Y-%m-%d")
+cutoff_time = ist.localize(datetime.strptime(today_str + " 17:30:00", "%Y-%m-%d %H:%M:%S"))
+
+if "last_refresh_date" not in st.session_state:
+    st.session_state.last_refresh_date = ""
+
+if (now_ist >= cutoff_time and st.session_state.last_refresh_date != today_str) or "daily_cm_questions" not in st.session_state:
+    st.session_state.daily_cm_questions = random.sample(cross_pool, 10)
+    st.session_state.last_refresh_date = today_str
+
+cross_multiplication_questions = st.session_state.daily_cm_questions
+
 # --- UI Setup ---
 st.set_page_config(page_title="Govt Exam AI Tutor", layout="centered")
 st.title("🇮🇳 Govt Exam AI Tutor")
@@ -31,7 +57,11 @@ st.markdown("Practice and learn for SSC, Banking, Railways and more!")
 
 # Sidebar for subject selection
 st.sidebar.title("Navigation")
-section = st.sidebar.radio("Choose Section", ["Chat with Tutor", "Take a Quiz", "Shortcut Tips"], key="section_selector")
+section = st.sidebar.radio(
+    "Choose Section",
+    ["Chat with Tutor", "Take a Quiz", "Shortcut Tips", "Cross Multiplication Practice"],
+    key="section_selector"
+)
 
 # --- Chat with AI Tutor ---
 if section == "Chat with Tutor":
@@ -122,6 +152,52 @@ elif section == "Shortcut Tips":
     selected_subject = st.selectbox("Choose subject to view tips", list(shortcut_notes.keys()), key="tip_subject")
     for i, tip in enumerate(shortcut_notes[selected_subject], 1):
         st.markdown(f"**Tip {i}:** {tip}")
+
+# --- Cross Multiplication Practice Section ---
+elif section == "Cross Multiplication Practice":
+    st.subheader("🔟 Advanced Cross Multiplication Problems")
+    st.markdown("These are tough but solvable with cancellation. Take 2–3 minutes each.")
+
+    if "cm_answers" not in st.session_state:
+        st.session_state.cm_answers = {}
+    if "cm_submitted" not in st.session_state:
+        st.session_state.cm_submitted = {}
+    if "cm_start_times" not in st.session_state:
+        st.session_state.cm_start_times = {}
+    if "cm_elapsed" not in st.session_state:
+        st.session_state.cm_elapsed = {}
+    if "cm_show_answer" not in st.session_state:
+        st.session_state.cm_show_answer = {}
+
+    for idx, q in enumerate(cross_multiplication_questions, 1):
+        st.markdown(f"**Q{idx}:** `{q['expression']}`")
+
+        if idx not in st.session_state.cm_start_times:
+            st.session_state.cm_start_times[idx] = time.time()
+
+        user_input = st.text_input(f"Your answer for Q{idx}", key=f"cm_input_{idx}")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button(f"Submit Q{idx}"):
+                end_time = time.time()
+                st.session_state.cm_elapsed[idx] = round(end_time - st.session_state.cm_start_times[idx], 2)
+                st.session_state.cm_answers[idx] = user_input
+                st.session_state.cm_submitted[idx] = True
+        with col2:
+            if st.button(f"Show Answer Q{idx}"):
+                st.session_state.cm_show_answer[idx] = True
+
+        if st.session_state.cm_submitted.get(idx):
+            elapsed = st.session_state.cm_elapsed.get(idx, 0)
+            if user_input == q['answer']:
+                st.success(f"✅ Correct! (⏱️ {elapsed} sec)")
+            else:
+                st.warning(f"❌ Submitted. You can view the correct answer.")
+                st.info(f"⏱️ Time taken: {elapsed} sec")
+
+        if st.session_state.cm_show_answer.get(idx):
+            st.info(f"📘 Correct Answer: {q['answer']}")
 
 st.markdown("---")
 st.caption("Built for Indian aspirants by an AI tutor. Powered by OpenAI.")
