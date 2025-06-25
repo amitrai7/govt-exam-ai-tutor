@@ -62,12 +62,10 @@ query_section = st.query_params.get("section", [sections[0]])
 if query_section not in sections:
     query_section = sections[0]
 
-section = st.sidebar.radio(
-    "Choose Section",
-    sections,
-    index=sections.index(query_section) if query_section in sections else 0,
-    key="section_selector"
-)
+if "section_selector" not in st.session_state:
+    st.session_state.section_selector = query_section
+
+section = st.sidebar.radio("Choose Section", sections, index=sections.index(st.session_state.section_selector), key="section_selector")
 
 if st.query_params.get("section", [None])[0] != section:
     st.query_params["section"] = section
