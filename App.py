@@ -55,13 +55,17 @@ st.set_page_config(page_title="Govt Exam AI Tutor", layout="centered")
 st.title("🇮🇳 Govt Exam AI Tutor")
 st.markdown("Practice and learn for SSC, Banking, Railways and more!")
 
-# Sidebar for subject selection
-st.sidebar.title("Navigation")
-section = st.sidebar.radio(
-    "Choose Section",
-    ["Chat with Tutor", "Take a Quiz", "Shortcut Tips", "Cross Multiplication Practice"],
-    key="section_selector"
-)
+# Sidebar for section navigation with persistence using query params
+sections = ["Chat with Tutor", "Take a Quiz", "Shortcut Tips", "Cross Multiplication Practice"]
+section_from_url = st.query_params.get("section", [None])[0]
+
+if "section_selector" not in st.session_state:
+    st.session_state.section_selector = section_from_url if section_from_url in sections else sections[0]
+
+section = st.sidebar.radio("Choose Section", sections, key="section_selector")
+
+if section != section_from_url:
+    st.query_params["section"] = section
 
 # --- Chat with AI Tutor ---
 if section == "Chat with Tutor":
@@ -155,7 +159,7 @@ elif section == "Shortcut Tips":
 
 # --- Cross Multiplication Practice Section ---
 elif section == "Cross Multiplication Practice":
-    st.subheader("🔟 Advanced Cross Multiplication Problems")
+    st.subheader("🕟 Advanced Cross Multiplication Problems")
     st.markdown("These are tough but solvable with cancellation. Take 2–3 minutes each.")
 
     if "cm_answers" not in st.session_state:
