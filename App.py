@@ -3,6 +3,7 @@ import os
 import random
 import json
 from openai import OpenAI
+import math
 
 # Set up OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -10,17 +11,18 @@ client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 # --- Load Quiz Data from JSON File ---
 @st.cache_data
 def load_quiz_data():
-    with open("quiz_questions", "r") as f:
+    with open("quiz_questions.json", "r") as f:
         return json.load(f)
 
 quiz_data = load_quiz_data()
 
-# --- Shortcut Notes Data ---
-shortcut_notes = {
-    "English Language": "**Tip:** Learn root words. For example, 'bene' means good → beneficial, benevolent.",
-    "Reasoning Ability": "**Tip:** Practice blood relation and direction problems using diagrams to avoid confusion.",
-    "Quantitative Aptitude": "**Tip:** Use the formula A = (P × R × T)/100 for simple interest. Learn tables till 20 by heart."
-}
+# --- Load Shortcut Tips from JSON File ---
+@st.cache_data
+def load_tips():
+    with open("shortcut_tips.json", "r") as f:
+        return json.load(f)
+
+shortcut_notes = load_tips()
 
 # --- UI Setup ---
 st.set_page_config(page_title="Govt Exam AI Tutor", layout="centered")
@@ -61,7 +63,7 @@ elif section == "Take a Quiz":
         st.session_state[f"{subject}_page"] = 1
 
     page = st.session_state[f"{subject}_page"]
-    total_pages = len(total_questions) // 5
+    total_pages = math.ceil(len(total_questions) / 5)
 
     start_index = (page - 1) * 5
     end_index = start_index + 5
@@ -118,7 +120,8 @@ elif section == "Take a Quiz":
 elif section == "Shortcut Tips":
     st.subheader("Shortcut Tricks and Concepts")
     selected_subject = st.selectbox("Choose subject to view tips", list(shortcut_notes.keys()), key="tip_subject")
-    st.markdown(shortcut_notes[selected_subject])
+    for i, tip in enumerate(shortcut_notes[selected_subject], 1):
+        st.markdown(f"**Tip {i}:** {tip}")
 
 st.markdown("---")
 st.caption("Built for Indian aspirants by an AI tutor. Powered by OpenAI.")
