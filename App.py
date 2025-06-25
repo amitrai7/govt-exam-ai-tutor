@@ -1,43 +1,25 @@
 import streamlit as st
 import os
 import random
+import json
 from openai import OpenAI
 
 # Set up OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# --- Quiz Data Example (You can expand this or load from a file) ---
-quiz_data = {
-    "English Language": [
-        {
-            "question": "Choose the correct synonym of 'Abundant'",
-            "options": ["Rare", "Plentiful", "Insufficient", "Tiny"],
-            "answer": "Plentiful",
-            "explanation": "'Abundant' means available in large quantities, i.e., plentiful."
-        },
-        {
-            "question": "Identify the part of speech of the word 'Quickly'",
-            "options": ["Adjective", "Verb", "Noun", "Adverb"],
-            "answer": "Adverb",
-            "explanation": "'Quickly' describes how something is done, so it's an adverb."
-        }
-    ],
-    "Reasoning Ability": [
-        {
-            "question": "If A = 1, B = 2, ..., what is the value of C + D + E?",
-            "options": ["9", "10", "12", "15"],
-            "answer": "12",
-            "explanation": "C=3, D=4, E=5, so 3+4+5=12."
-        }
-    ],
-    "Quantitative Aptitude": [
-        {
-            "question": "What is 25% of 160?",
-            "options": ["30", "40", "50", "60"],
-            "answer": "40",
-            "explanation": "25% of 160 = (25/100) * 160 = 40."
-        }
-    ]
+# --- Load Quiz Data from JSON File ---
+@st.cache_data
+def load_quiz_data():
+    with open("quiz_questions", "r") as f:
+        return json.load(f)
+
+quiz_data = load_quiz_data()
+
+# --- Shortcut Notes Data ---
+shortcut_notes = {
+    "English Language": "**Tip:** Learn root words. For example, 'bene' means good → beneficial, benevolent.",
+    "Reasoning Ability": "**Tip:** Practice blood relation and direction problems using diagrams to avoid confusion.",
+    "Quantitative Aptitude": "**Tip:** Use the formula A = (P × R × T)/100 for simple interest. Learn tables till 20 by heart."
 }
 
 # --- UI Setup ---
@@ -47,7 +29,7 @@ st.markdown("Practice and learn for SSC, Banking, Railways and more!")
 
 # Sidebar for subject selection
 st.sidebar.title("Navigation")
-section = st.sidebar.radio("Choose Section", ["Chat with Tutor", "Take a Quiz"], key="section_selector")
+section = st.sidebar.radio("Choose Section", ["Chat with Tutor", "Take a Quiz", "Shortcut Tips"], key="section_selector")
 
 # --- Chat with AI Tutor ---
 if section == "Chat with Tutor":
@@ -73,46 +55,70 @@ if section == "Chat with Tutor":
 elif section == "Take a Quiz":
     st.subheader("Mini Quiz")
     subject = st.selectbox("Choose a subject", list(quiz_data.keys()))
+    total_questions = quiz_data[subject]
 
-    if "quiz_started" not in st.session_state:
-        st.session_state.quiz_started = False
-    if "quiz_questions" not in st.session_state:
-        st.session_state.quiz_questions = []
+    if f"{subject}_page" not in st.session_state:
+        st.session_state[f"{subject}_page"] = 1
+
+    page = st.session_state[f"{subject}_page"]
+    total_pages = len(total_questions) // 5
+
+    start_index = (page - 1) * 5
+    end_index = start_index + 5
+    questions = total_questions[start_index:end_index]
+
     if "quiz_answers" not in st.session_state:
         st.session_state.quiz_answers = {}
     if "submitted_flags" not in st.session_state:
         st.session_state.submitted_flags = {}
 
-    if st.button("Start Quiz"):
-        st.session_state.quiz_started = True
-        st.session_state.quiz_questions = random.sample(quiz_data[subject], min(3, len(quiz_data[subject])))
-        st.session_state.quiz_answers = {}
-        st.session_state.submitted_flags = {}
+    score = 0
+    for i, q in enumerate(questions):
+        q_index = start_index + i
+        st.write(f"**Q{q_index+1}: {q['question']}**")
+        selected = st.radio("Choose one:", q['options'], key=f"q{q_index}_radio")
+        if st.button("Submit Answer", key=f"submit{q_index}"):
+            st.session_state.quiz_answers[f"q{q_index}"] = selected
+            st.session_state.submitted_flags[f"q{q_index}"] = True
+        if st.session_state.submitted_flags.get(f"q{q_index}", False):
+            st.markdown(f"📝 *Answer submitted: {st.session_state.quiz_answers[f'q{q_index}']}*")
 
-    if st.session_state.quiz_started:
-        score = 0
-        for i, q in enumerate(st.session_state.quiz_questions):
-            st.write(f"**Q{i+1}: {q['question']}**")
-            selected = st.radio("Choose one:", q['options'], key=f"q{i}_radio")
-            if st.button("Submit Answer", key=f"submit{i}"):
-                st.session_state.quiz_answers[f"q{i}"] = selected
-                st.session_state.submitted_flags[f"q{i}"] = True
-            if st.session_state.submitted_flags.get(f"q{i}", False):
-                st.markdown(f"📝 *Answer submitted: {st.session_state.quiz_answers[f'q{i}']}*")
-
-        # Display results
-        if st.button("Show Final Score"):
-            for i, q in enumerate(st.session_state.quiz_questions):
-                selected = st.session_state.quiz_answers.get(f"q{i}", None)
+    if st.button("Show Score for This Page"):
+        all_answered = True
+        for i, q in enumerate(questions):
+            q_index = start_index + i
+            if f"q{q_index}" not in st.session_state.quiz_answers:
+                st.error(f"⚠️ Q{q_index+1} is unanswered. Please answer all questions before viewing score.")
+                all_answered = False
+        if all_answered:
+            for i, q in enumerate(questions):
+                q_index = start_index + i
+                selected = st.session_state.quiz_answers.get(f"q{q_index}", None)
                 if selected:
                     if selected == q['answer']:
-                        st.success(f"Q{i+1}: ✅ Correct")
+                        st.success(f"Q{q_index+1}: ✅ Correct")
                         score += 1
                     else:
-                        st.error(f"Q{i+1}: ❌ Incorrect. Correct Answer: {q['answer']}")
+                        st.error(f"Q{q_index+1}: ❌ Incorrect. Correct Answer: {q['answer']}")
                     st.info(q['explanation'])
             st.markdown("---")
-            st.write(f"### ✅ Your Score: {score}/{len(st.session_state.quiz_questions)}")
+            st.write(f"### ✅ Your Score: {score}/{len(questions)}")
+
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("⬅ Previous Page") and page > 1:
+            st.session_state[f"{subject}_page"] -= 1
+            st.rerun()
+    with col2:
+        if st.button("Next Page ➡") and page < total_pages:
+            st.session_state[f"{subject}_page"] += 1
+            st.rerun()
+
+# --- Shortcut Tips Section ---
+elif section == "Shortcut Tips":
+    st.subheader("Shortcut Tricks and Concepts")
+    selected_subject = st.selectbox("Choose subject to view tips", list(shortcut_notes.keys()), key="tip_subject")
+    st.markdown(shortcut_notes[selected_subject])
 
 st.markdown("---")
 st.caption("Built for Indian aspirants by an AI tutor. Powered by OpenAI.")
