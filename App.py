@@ -55,16 +55,19 @@ st.set_page_config(page_title="Govt Exam AI Tutor", layout="centered")
 st.title("🇮🇳 Govt Exam AI Tutor")
 st.markdown("Practice and learn for SSC, Banking, Railways and more!")
 
-# Sidebar for section navigation with persistence using query params
+# Sidebar for section navigation
 sections = ["Chat with Tutor", "Take a Quiz", "Shortcut Tips", "Cross Multiplication Practice"]
-section_from_url = st.query_params.get("section", [None])[0]
+query_section = st.query_params.get("section", [sections[0]])
+
+if query_section not in sections:
+    query_section = sections[0]
 
 if "section_selector" not in st.session_state:
-    st.session_state.section_selector = section_from_url if section_from_url in sections else sections[0]
+    st.session_state.section_selector = query_section
 
-section = st.sidebar.radio("Choose Section", sections, key="section_selector")
+section = st.sidebar.radio("Choose Section", sections, index=sections.index(st.session_state.section_selector), key="section_selector")
 
-if section != section_from_url:
+if st.query_params.get("section", [None])[0] != section:
     st.query_params["section"] = section
 
 # --- Chat with AI Tutor ---
@@ -117,7 +120,7 @@ elif section == "Take a Quiz":
             st.session_state.quiz_answers[f"q{q_index}"] = selected
             st.session_state.submitted_flags[f"q{q_index}"] = True
         if st.session_state.submitted_flags.get(f"q{q_index}", False):
-            st.markdown(f"📝 *Answer submitted: {st.session_state.quiz_answers[f'q{q_index}']}*")
+            st.markdown(f"📜 *Answer submitted: {st.session_state.quiz_answers[f'q{q_index}']}*")
 
     if st.button("Show Score for This Page"):
         all_answered = True
@@ -176,19 +179,25 @@ elif section == "Cross Multiplication Practice":
     for idx, q in enumerate(cross_multiplication_questions, 1):
         st.markdown(f"**Q{idx}:** `{q['expression']}`")
 
-        if idx not in st.session_state.cm_start_times:
-            st.session_state.cm_start_times[idx] = time.time()
-
         user_input = st.text_input(f"Your answer for Q{idx}", key=f"cm_input_{idx}")
 
-        col1, col2 = st.columns(2)
+        col1, col2, col3 = st.columns(3)
         with col1:
-            if st.button(f"Submit Q{idx}"):
-                end_time = time.time()
-                st.session_state.cm_elapsed[idx] = round(end_time - st.session_state.cm_start_times[idx], 2)
-                st.session_state.cm_answers[idx] = user_input
-                st.session_state.cm_submitted[idx] = True
+            if st.button(f"Start Q{idx}"):
+                st.session_state.cm_start_times[idx] = time.time()
+                st.success("Timer started!")
+
         with col2:
+            if st.button(f"Submit Q{idx}"):
+                if idx in st.session_state.cm_start_times:
+                    end_time = time.time()
+                    st.session_state.cm_elapsed[idx] = round(end_time - st.session_state.cm_start_times[idx], 2)
+                    st.session_state.cm_answers[idx] = user_input
+                    st.session_state.cm_submitted[idx] = True
+                else:
+                    st.error("Please start the timer before submitting.")
+
+        with col3:
             if st.button(f"Show Answer Q{idx}"):
                 st.session_state.cm_show_answer[idx] = True
 
@@ -197,7 +206,7 @@ elif section == "Cross Multiplication Practice":
             if user_input == q['answer']:
                 st.success(f"✅ Correct! (⏱️ {elapsed} sec)")
             else:
-                st.warning(f"❌ Submitted. You can view the correct answer.")
+                st.warning("❌ Submitted. You can view the correct answer.")
                 st.info(f"⏱️ Time taken: {elapsed} sec")
 
         if st.session_state.cm_show_answer.get(idx):
