@@ -7,6 +7,7 @@ from openai import OpenAI
 import math
 from datetime import datetime, timedelta
 import pytz
+import requests
 
 # Set up OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
@@ -56,8 +57,14 @@ st.title("🇮🇳 Govt Exam AI Tutor")
 st.markdown("Practice and learn for SSC, Banking, Railways and more!")
 
 # Sidebar for section navigation
-sections = ["Chat with Tutor", "Take a Quiz", "Shortcut Tips", "Cross Multiplication Practice"]
-query_section = st.query_params.get("section", [sections[0]])
+sections = [
+    "Chat with Tutor",
+    "Take a Quiz",
+    "Shortcut Tips",
+    "Cross Multiplication Practice",
+    "Topic-wise Concepts & Practice"
+]
+query_section = st.query_params.get("section", sections[0])
 
 if query_section not in sections:
     query_section = sections[0]
@@ -67,8 +74,7 @@ if "section_selector" not in st.session_state:
 
 section = st.sidebar.radio("Choose Section", sections, index=sections.index(st.session_state.section_selector), key="section_selector")
 
-
-if st.query_params.get("section", [None])[0] != section:
+if st.query_params.get("section", None) != section:
     st.query_params["section"] = section
 
 # --- Chat with AI Tutor ---
@@ -212,6 +218,35 @@ elif section == "Cross Multiplication Practice":
 
         if st.session_state.cm_show_answer.get(idx):
             st.info(f"📘 Correct Answer: {q['answer']}")
+
+# --- Topic-wise Concepts and Practice Section ---
+elif section == "Topic-wise Concepts & Practice":
+    st.subheader("📚 Learn by Topic")
+
+    topic = st.text_input("Enter topic (e.g., Profit and Loss, Percentage, Algebra)", key="topic_input")
+    if topic:
+        with st.spinner("Fetching concept and quiz from backend API..."):
+            try:
+                response = requests.get("https://govt-exam-ai-tutor.onrender.com/topic-quiz", params={"topic": topic})
+                if response.status_code == 200:
+                    result = response.json()
+                    st.markdown(f"### 📘 Concept Summary: {topic}")
+                    st.info(result.get("concept", "No concept found."))
+
+                    st.markdown("### 🧪 Practice Questions")
+                    for i, item in enumerate(result.get("quiz", []), 1):
+                        st.markdown(f"**Q{i}: {item['question']}**")
+                        options = item["options"]
+                        user_ans = st.radio("Choose:", options, key=f"topic_q_{i}")
+                        if st.button("Submit", key=f"topic_submit_{i}"):
+                            if user_ans == item["answer"]:
+                                st.success("✅ Correct!")
+                            else:
+                                st.error(f"❌ Incorrect. Correct: {item['answer']}")
+                else:
+                    st.warning("Could not fetch data from backend API.")
+            except Exception as e:
+                st.error("Error contacting backend: " + str(e))
 
 st.markdown("---")
 st.caption("Built for Indian aspirants by an AI tutor. Powered by OpenAI.")
