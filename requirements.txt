@@ -1,2 +1,7 @@
 streamlit
 openai
+fastapi
+uvicorn
+requests
+beautifulsoup4
+certifi
