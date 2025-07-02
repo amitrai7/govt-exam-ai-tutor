@@ -5,7 +5,7 @@ from concept_data import CONCEPT_DB
 
 app = FastAPI(title="Govt Exam Tutor API", version="1.0")
 
-# Enable CORS for all origins (for local dev)
+# Enable CORS for all origins
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -20,3 +20,7 @@ def get_topic_quiz(topic: str = Query(..., description="Topic name like 'profit 
     if topic_lower in CONCEPT_DB:
         return CONCEPT_DB[topic_lower]
     return {"concept": "No data found for this topic.", "quiz": []}
+
+@app.get("/topics")
+def list_topics():
+    return {"topics": sorted([k.title() for k in CONCEPT_DB.keys()])}
