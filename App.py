@@ -220,10 +220,21 @@ elif section == "Cross Multiplication Practice":
             st.info(f"📘 Correct Answer: {q['answer']}")
 
 # --- Topic-wise Concepts and Practice Section ---
-elif section == "Topic-wise Concepts & Practice":
+if section == "Topic-wise Concepts & Practice":
     st.subheader("📚 Learn by Topic")
 
-    topic = st.text_input("Enter topic (e.g., Profit and Loss, Percentage, Algebra)", key="topic_input")
+    try:
+        all_topics_response = requests.get("https://govt-exam-ai-tutor.onrender.com/topics")
+        if all_topics_response.status_code == 200:
+            data = all_topics_response.json()
+            available_topics = data.get("topics", [])
+        else:
+            available_topics = []
+    except:
+        available_topics = []
+
+    topic = st.selectbox("Select a topic", available_topics, key="topic_dropdown")
+
     if topic:
         with st.spinner("Fetching concept and quiz from backend API..."):
             try:
